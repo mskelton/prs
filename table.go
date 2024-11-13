@@ -18,7 +18,32 @@ const (
 	CellColorBlue    CellColor = "blue"
 	CellColorMagenta CellColor = "magenta"
 	CellColorCyan    CellColor = "cyan"
+	CellColorGray    CellColor = "gray"
+	CellColorDim     CellColor = "dim"
 )
+
+func getColor(c CellColor) *color.Color {
+	switch c {
+	case CellColorRed:
+		return color.New(color.FgRed)
+	case CellColorGreen:
+		return color.New(color.FgGreen)
+	case CellColorYellow:
+		return color.New(color.FgYellow)
+	case CellColorBlue:
+		return color.New(color.FgBlue)
+	case CellColorMagenta:
+		return color.New(color.FgMagenta)
+	case CellColorCyan:
+		return color.New(color.FgCyan)
+	case CellColorGray:
+		return color.RGB(99, 101, 123)
+	case CellColorDim:
+		return color.New(color.FgWhite)
+	}
+
+	return color.New(color.FgHiWhite)
+}
 
 const separator = "  "
 
@@ -43,7 +68,7 @@ func pad(str string, w int) string {
 
 func (table *Table) Print() {
 	widths := make([]int, len(table.Columns))
-	boldUnderline := color.New().Add(color.Bold, color.Underline).SprintFunc()
+	headerColor := getColor(CellColorGray).Add(color.Underline).SprintFunc()
 
 	// Find the maximum width of each column
 	for _, row := range table.Rows {
@@ -65,7 +90,7 @@ func (table *Table) Print() {
 	var header []string
 	for i, col := range table.Columns {
 		if widths[i] > 0 {
-			header = append(header, boldUnderline(pad(col, widths[i])))
+			header = append(header, headerColor(pad(col, widths[i])))
 		}
 	}
 
@@ -89,7 +114,9 @@ func (table *Table) Print() {
 
 		for i, cell := range row.Cells {
 			if widths[i] > 0 {
-				cells = append(cells, pad(cell.Value, widths[i]))
+				color := getColor(cell.Color).SprintFunc()
+
+				cells = append(cells, color(pad(cell.Value, widths[i])))
 			}
 		}
 

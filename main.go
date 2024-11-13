@@ -6,66 +6,72 @@ import (
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/mergestat/timediff"
 )
 
-type PR struct {
-	Number    int    `json:"number"`
-	Title     string `json:"title"`
+type PullRequest struct {
 	Branch    string `json:"headRefName"`
 	CreatedAt string `json:"createdAt"`
+	IsDraft   bool   `json:"isDraft"`
+	Number    int    `json:"number"`
 	State     string `json:"state"`
+	Title     string `json:"title"`
 	Url       string `json:"url"`
 }
 
 func timeAgo(createdAt string) string {
 	t, _ := time.Parse(time.RFC3339, createdAt)
-	duration := time.Since(t)
-	hours := int(duration.Hours())
 
-	if hours == 0 {
-		return fmt.Sprintf("about %d minutes ago", int(duration.Minutes()))
-	}
-
-	return fmt.Sprintf("about %d hours ago", hours)
+	return timediff.TimeDiff(t)
 }
 
-func createTableRow(pr PR) Row {
-	var numberColor CellColor
-	if pr.State == "OPEN" {
-		numberColor = CellColorGreen
-	} else {
-		numberColor = CellColorMagenta
+func colorForPRState(pr PullRequest) CellColor {
+	switch pr.State {
+	case "OPEN":
+		if pr.IsDraft {
+			return "gray"
+		}
+		return "green"
+	case "CLOSED":
+		return "red"
+	case "MERGED":
+		return "magenta"
+	default:
+		return ""
 	}
+}
 
+func createTableRow(pr PullRequest) Row {
 	return Row{
 		Cells: []Cell{
-			{Value: fmt.Sprintf("#%d", pr.Number), Color: numberColor},
+			{Value: fmt.Sprintf("#%d", pr.Number), Color: colorForPRState(pr)},
 			{Value: pr.Title},
-			{Value: pr.Branch, Color: CellColorCyan},
 			{Value: pr.Url, Color: CellColorBlue},
-			{Value: timeAgo(pr.CreatedAt)},
+			{Value: timeAgo(pr.CreatedAt), Color: CellColorDim},
 		},
 	}
 }
 
 func main() {
-	// Fetch PR data from GitHub CLI
-	cmd := exec.Command("gh", "pr", "list", "--json", "number,title,headRefName,createdAt,state,url")
+	cmd := exec.Command("gh", "pr", "list", "--json", "number,title,headRefName,createdAt,state,url,isDraft")
+	cmd.Args = append(cmd.Args, os.Args[1:]...)
+	cmd.Stderr = os.Stderr
+
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
 	// Parse JSON data into PR struct
-	var prs []PR
+	var prs []PullRequest
 	if err := json.Unmarshal(output, &prs); err != nil {
 		fmt.Println("Error parsing JSON:", err)
 		os.Exit(1)
 	}
 
 	table := Table{
-		Columns: []string{"ID", "TITLE", "BRANCH", "URL", "CREATED AT"},
+		Columns: []string{"ID", "TITLE", "URL", "CREATED AT"},
 		Rows:    []Row{},
 	}
 

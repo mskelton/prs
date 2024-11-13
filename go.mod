@@ -5,6 +5,7 @@ go 1.22.5
 require (
 	github.com/fatih/color v1.18.0
 	github.com/mattn/go-runewidth v0.0.16
+	github.com/mergestat/timediff v0.0.3
 )
 
 require (
