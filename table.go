@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/fatih/color"
@@ -66,6 +67,12 @@ func pad(str string, w int) string {
 	return str + strings.Repeat(" ", w-runewidth.StringWidth(str))
 }
 
+func toUpper(str string) string {
+	re := regexp.MustCompile("([a-z])([A-Z])")
+	withSpaces := re.ReplaceAllString(str, "${1} ${2}")
+	return strings.ToUpper(withSpaces)
+}
+
 func (table *Table) Print() {
 	widths := make([]int, len(table.Columns))
 	headerColor := getColor(CellColorGray).Add(color.Underline).SprintFunc()
@@ -90,7 +97,7 @@ func (table *Table) Print() {
 	var header []string
 	for i, col := range table.Columns {
 		if widths[i] > 0 {
-			header = append(header, headerColor(pad(col, widths[i])))
+			header = append(header, headerColor(pad(toUpper(col), widths[i])))
 		}
 	}
 

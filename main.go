@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/mergestat/timediff"
@@ -13,6 +14,7 @@ import (
 type PullRequest struct {
 	Branch    string `json:"headRefName"`
 	CreatedAt string `json:"createdAt"`
+	ClosedAt  string `json:"closedAt"`
 	IsDraft   bool   `json:"isDraft"`
 	Number    int    `json:"number"`
 	State     string `json:"state"`
@@ -21,8 +23,11 @@ type PullRequest struct {
 }
 
 func timeAgo(createdAt string) string {
-	t, _ := time.Parse(time.RFC3339, createdAt)
+	if createdAt == "" {
+		return ""
+	}
 
+	t, _ := time.Parse(time.RFC3339, createdAt)
 	return timediff.TimeDiff(t)
 }
 
@@ -42,21 +47,39 @@ func colorForPRState(pr PullRequest) CellColor {
 	}
 }
 
-func createTableRow(pr PullRequest) Row {
-	return Row{
-		Cells: []Cell{
-			{Value: fmt.Sprintf("#%d", pr.Number), Color: colorForPRState(pr)},
-			{Value: pr.Title},
-			{Value: pr.Url, Color: CellColorBlue},
-			{Value: timeAgo(pr.CreatedAt), Color: CellColorDim},
-		},
+func createTableRow(pr PullRequest, columns []string) Row {
+	cells := []Cell{}
+
+	for _, column := range columns {
+		switch column {
+		case "id":
+			cells = append(cells, Cell{Value: fmt.Sprintf("#%d", pr.Number), Color: colorForPRState(pr)})
+		case "title":
+			cells = append(cells, Cell{Value: pr.Title})
+		case "url":
+			cells = append(cells, Cell{Value: pr.Url, Color: CellColorBlue})
+		case "createdAt":
+			cells = append(cells, Cell{Value: timeAgo(pr.CreatedAt), Color: CellColorDim})
+		case "closedAt":
+			cells = append(cells, Cell{Value: timeAgo(pr.ClosedAt), Color: CellColorDim})
+		}
 	}
+
+	return Row{Cells: cells}
 }
 
 func main() {
-	cmd := exec.Command("gh", "pr", "list", "--json", "number,title,headRefName,createdAt,state,url,isDraft")
-	cmd.Args = append(cmd.Args, os.Args[1:]...)
+	cmd := exec.Command("gh", "pr", "list", "--json", "number,title,headRefName,createdAt,closedAt,state,url,isDraft")
 	cmd.Stderr = os.Stderr
+
+	columns := []string{"id", "title", "url", "createdAt", "closedAt"}
+
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "--columns=") {
+		columns = strings.Split(strings.TrimPrefix(os.Args[1], "--columns="), ",")
+		cmd.Args = append(cmd.Args, os.Args[2:]...)
+	} else {
+		cmd.Args = append(cmd.Args, os.Args[1:]...)
+	}
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -71,12 +94,12 @@ func main() {
 	}
 
 	table := Table{
-		Columns: []string{"ID", "TITLE", "URL", "CREATED AT"},
+		Columns: columns,
 		Rows:    []Row{},
 	}
 
 	for _, pr := range prs {
-		table.Rows = append(table.Rows, createTableRow(pr))
+		table.Rows = append(table.Rows, createTableRow(pr, columns))
 	}
 
 	table.Print()
